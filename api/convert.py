@@ -1,57 +1,50 @@
-# api/convert.py
+# api/convert.py (Aapka updated code)
+
 import json
 import base64
 from PyPDF2 import PdfReader
 from docx import Document
 from io import BytesIO
 
+# Nayi Utility Function (Headers set karne ke liye)
+def get_response(data, status_code=200):
+    # Yeh headers CORS ko allow karte hain
+    headers = {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*', # <-- Har domain ko allow karo
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+    }
+    return json.dumps(data), status_code, headers
+
+# Aapka main handler function
 def handler(request):
-    """
-    PDF file (base64 encoded) leta hai aur use Word (DOCX) file mein convert karke 
-    base64 string ki shakal mein wapis bhejta hai.
-    """
     
-    # 1. Incoming Request (JSON) ko Parse karna
-    try:
-        data = request.json
-        if not data or 'pdf_base64' not in data:
-            return json.dumps({"error": "No PDF data found"}), 400, {'Content-Type': 'application/json'}
+    # 1. CORS Pre-flight (OPTIONS request) handle karna zaroori hai
+    if request.method == 'OPTIONS':
+        # Agar browser pehle OPTIONS request bhejta hai, to seedha headers wapas kar do
+        return get_response({"status": "CORS pre-flight success"}, 204)
         
-        # Base64 string se binary PDF data decode karna
-        pdf_data = base64.b64decode(data['pdf_base64'])
-        pdf_file = BytesIO(pdf_data)
+    # 2. Asli POST request
+    if request.method == 'POST':
+        try:
+            # ... (Baaki code jaisa pehle tha) ...
+            data = request.json
+            if not data or 'pdf_base64' not in data:
+                return get_response({"error": "No PDF data found"}, 400)
+            
+            # ... (Conversion Logic - PDF padhna aur DOCX banana) ...
+            
+            # 5. Result wapis Android App ko bhejna
+            # Ab yahan 'get_response' function use hoga
+            return get_response({
+                "status": "success",
+                "docx_base64": docx_base64,
+                "filename": "converted_document.docx"
+            }, 200)
 
-    except Exception as e:
-        return json.dumps({"error": f"Invalid input format: {e}"}), 400, {'Content-Type': 'application/json'}
-
-    # 2. PDF to DOCX Conversion Logic (Simple Text Extraction)
-    try:
-        pdf_reader = PdfReader(pdf_file)
-        document = Document()
-        
-        # Har page se text nikalna
-        for page in pdf_reader.pages:
-            text = page.extract_text()
-            if text:
-                document.add_paragraph(text)
-                # Har page ke baad ek line break
-                document.add_paragraph('--- NEW PAGE ---') 
-        
-        # 3. DOCX file ko memory (BytesIO) mein save karna
-        docx_file = BytesIO()
-        document.save(docx_file)
-        docx_file.seek(0)
-        
-        # 4. DOCX data ko base64 mein encode karna
-        docx_base64 = base64.b64encode(docx_file.read()).decode('utf-8')
-        
-        # 5. Result wapis Android App ko bhejna
-        return json.dumps({
-            "status": "success",
-            "docx_base64": docx_base64,
-            "filename": "converted_document.docx"
-        }), 200, {'Content-Type': 'application/json'}
-
-    except Exception as e:
-        # Koi bhi error ho to use handle karna
-        return json.dumps({"error": f"Conversion failed: {e}"}), 500, {'Content-Type': 'application/json'}
+        except Exception as e:
+            return get_response({"error": f"Conversion failed: {e}"}, 500)
+    
+    # Agar na OPTIONS na POST ho
+    return get_response({"error": "Method not allowed"}, 405)
